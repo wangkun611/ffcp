@@ -7,7 +7,7 @@ typedef struct huffman_decode_node
     unsigned int flags;
     int sym;
 }huffman_decode_node;
-#define NODE_ITEM(next, output, sym)   {next,of,sym}
+#define NODE_ITEM(next, of, sym)   {next,of,sym}
 #include "huffman_table.h"
 
 int
