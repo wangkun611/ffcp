@@ -200,14 +200,14 @@ int main(int argc, char** argv)
             if (item->fstate == -1) {
                 cuttedTree = 1;
             }
-            fprintf(file, "        {0x%02x, %d, %d},\n", item->fstate != -1 ? item->fstate : maxFstate + 1, item->output, item->sym);
+            fprintf(file, "        NODE_ITEM(0x%02x, %d, %d),\n", item->fstate != -1 ? item->fstate : maxFstate + 1, item->output, item->sym);
         }
         fprintf(file, "    },\n");
     }
     if (cuttedTree) {
         fprintf(file, "    /* %d */\n    {\n", maxFstate + 1);
         for (int j = 0; j < 1 << bitCount; j++) {
-            fprintf(file, "        {0x%02x, %d, %d},\n", maxFstate + 1, 0, 0);
+            fprintf(file, "        NODE_ITEM(0x%02x, %d, %d),\n", maxFstate + 1, 0, 0);
         }
         fprintf(file, "    },\n");
     }
