@@ -3,8 +3,8 @@
 
 typedef struct huffman_decode_node
 {
-    int fstate;
-    int flags;
+    unsigned int fstate;
+    unsigned int flags;
     int sym;
 }huffman_decode_node;
 
@@ -20,12 +20,12 @@ qpack_huffman_decode(char* dest, const char* src, size_t srclen, int fin) {
 
     for (; src != end;) {
         c = *src++;
-        t = &huffman_decode_table[t->fstate & 0xff][c >> 4];
+        t = &huffman_decode_table[t->fstate & 0x1ff][c >> 4];
         if (t->flags) {
             *p++ = t->sym;
         }
 
-        t = &huffman_decode_table[t->fstate & 0xff][c & 0xf];
+        t = &huffman_decode_table[t->fstate & 0x1ff][c & 0xf];
         if (t->flags) {
             *p++ = t->sym;
         }

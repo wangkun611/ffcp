@@ -9,9 +9,9 @@ typedef struct TreeNode
 {
     struct TreeNode* left;
     struct TreeNode* right;
-    int    reached;  /* 是否可达 */
-    int fstate;      /* 编号 */
-    int sym;
+    int    leaf;        /* 是否叶子节点 */
+    int    fstate;      /* 编号 */
+    int    sym;
 }TreeNode;
 
 typedef struct TableItem
@@ -58,38 +58,43 @@ int readLine(FILE* file, char* buff, int length, int *destLength)
 void processNode(TreeNode* root, TreeNode* node, int* maxFstate, int bitCount, TableItem *table)
 {
     for (int i = 0; i < (1 << bitCount); i++) {
-        TreeNode* curr = node->left ? node : root;
+        TreeNode* curr = node->left || node->right ? node : root;
         for (int j = bitCount - 1; j >= 0; j--) {
             if ((1<<j) & i) {
                 curr = curr->right;
             } else {
                 curr = curr->left;
             }
+            if (!curr) {
+                break;
+            }
             if (table) {
-                if (curr->fstate == -1 && curr->reached) {
+                if (curr->fstate == -1 && !curr->leaf) {
                     *maxFstate = *maxFstate + 1;
                     curr->fstate = *maxFstate;
                 }
             }
-            if (!curr->left) {
+            if (curr->leaf) {
                 if (table) {
                     table[i].output = 1;
                     table[i].sym = curr->sym;
                 }
+                // curr->reached = 1; 叶子节点直接到跟节点
                 curr = root;
             }
         }
 
         if (table) {
-            table[i].fstate = curr->fstate;
-        } else {
-            curr->reached = 1;
+            // curr 为NULL说明霍夫曼树有剪裁
+            table[i].fstate = curr ? curr->fstate : -1;
         }
     }
 }
 
 void travers(TreeNode* root, TreeNode* node, int* maxFstate, int bitCount, TableItem* table) {
-    processNode(root, node, maxFstate, bitCount, table ? table + node->fstate*(1<<bitCount) : NULL);
+    if (!table || !node->leaf) {
+        processNode(root, node, maxFstate, bitCount, table ? table + node->fstate * (1 << bitCount) : NULL);
+    }
     if (node->left) {
         travers(root, node->left, maxFstate, bitCount, table);
     }
@@ -126,6 +131,10 @@ int main(int argc, char** argv)
         TreeNode* curr = root;
         int i = 0;
         for (; i < length && curr; i++) {
+            if (curr->leaf) {
+                printf("line %d code conflict\n", lineCount + 1);
+                return 1;
+            }
             switch (buffer[i])
             {
             case '0':
@@ -159,6 +168,7 @@ int main(int argc, char** argv)
             }
         }
         if (curr) {
+            curr->leaf = 1;
             curr->sym = lineCount++;
         }
         maxDepth = max(maxDepth, i);
@@ -167,8 +177,6 @@ int main(int argc, char** argv)
 
     int bitCount = 4;
     int maxFstate = 0;
-    // 每次读4位
-    travers(root, root, NULL, bitCount, NULL);
     TableItem* table = calloc(nodeCount*(1<<bitCount), sizeof(TableItem));
     if (!table) {
         printf("OOM\n");
@@ -184,15 +192,26 @@ int main(int argc, char** argv)
     }
 
     fprintf(file, "const huffman_decode_node huffman_decode_table[][%d] = {\n", 1 <<bitCount);
+    int cuttedTree = 0;
     for (int i = 0; i <= maxFstate; i++) {
         fprintf(file, "    /* %d */\n    {\n", i);
         TableItem* item = table + i * (1 << bitCount);
         for (int j = 0; j < 1<<bitCount; j++, item++) {
-            fprintf(file, "        {0x%02x, %d, %d},\n", item->fstate, item->output, item->sym);
+            if (item->fstate == -1) {
+                cuttedTree = 1;
+            }
+            fprintf(file, "        {0x%02x, %d, %d},\n", item->fstate != -1 ? item->fstate : maxFstate + 1, item->output, item->sym);
         }
         fprintf(file, "    },\n");
     }
-    fprintf(file, "};");
+    if (cuttedTree) {
+        fprintf(file, "    /* %d */\n    {\n", maxFstate + 1);
+        for (int j = 0; j < 1 << bitCount; j++) {
+            fprintf(file, "        {0x%02x, %d, %d},\n", maxFstate + 1, 0, 0);
+        }
+        fprintf(file, "    },\n");
+    }
+    fprintf(file, "};\n");
     fclose(file);
     return 0;
 }
